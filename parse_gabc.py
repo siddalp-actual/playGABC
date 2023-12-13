@@ -145,7 +145,10 @@ class GabcParser:
             elif ch == "w":
                 self.ornament_last_note(ch)
 
-            elif ch in {"v", "/", "!", "\n", "z"}:
+            elif ch in {"v", "@", "/", "!", "\n", "z"}:
+                # v adds virga, @ suppresseses one
+                # / ! cause spacing to tweak the notes
+                # used in a neume
                 pass  # just ignore virga and spacing
 
             elif ch == ".":  # dotted note
@@ -159,6 +162,9 @@ class GabcParser:
                     dot_seen = True
 
                 self.maybe_lengthen_last_note(num_notes=num_notes)
+
+            elif ch == "r":  # hollow note
+                self.shorten_last_note()
 
             elif ch in {",", ";", ":"}:  # reached a bar
                 self.undo_accidental()
@@ -190,6 +196,13 @@ class GabcParser:
             for note_num in range(max(self.last_neume_len, num_notes)):
                 if not self.note_stream[-1 - note_num].doubled:  # already doubled
                     self.note_stream[-1 - note_num].increment_duration()
+
+    def shorten_last_note(self):
+        """
+        a hollow punctum is considered to be half normal
+        duration.
+        """
+        self.note_stream[-1].halve_duration()
 
     def set_accidental(self, on_off):
         """
@@ -258,14 +271,15 @@ class Note:
 
     """
 
-    LY_DURATION = ["", "4", "2", "2.", "1"]
+    LY_DURATION = ["", "8", "4", "2", "2.", "1"]
+    NORMAL_DURATION = 2
 
     logger = logging.getLogger("Note")
 
     def __init__(self, val: int):
         Note.logger.debug(f"__init__() created note {val}")
         self.val = val + 60
-        self.duration = 1
+        self.duration = self.NORMAL_DURATION
         self.ornamentation = None
         self.doubled = False
         Note.logger.info(f"{self.to_ly()}")
@@ -332,8 +346,14 @@ class Note:
         need to stop this happening twice when there is a dotted note just
         before a bar
         """
-        self.duration += 1
+        self.duration += self.NORMAL_DURATION
         self.doubled = True
+
+    def halve_duration(self):
+        """
+        make this note length that of half a punctum
+        """
+        self.duration = 1
 
     def ornament(self, ornamentation_type):
         """

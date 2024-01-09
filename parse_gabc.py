@@ -42,6 +42,7 @@ class GabcParser:
         re.compile(r"\[\d+\]"),  # eg [3] note spacing
         re.compile(r"\[.*?\]"),  # eg [ob:0;1mm] slur and [alt:stuff]
     ]
+    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]*)$")  # ignore case
 
     def __init__(self):
         self.tonic_adjust = 0
@@ -99,26 +100,29 @@ class GabcParser:
         for the moment, the following items are assumed to occur only once
         per syllable
         """
-        match_options = GabcParser.DOUBLE_BAR.match(g_str)  # double bar
-        if match_options:
-            self.maybe_lengthen_last_note()
+        match_obj = GabcParser.DOUBLE_BAR.match(g_str)  # double bar
+        if match_obj:
+            self.logger.debug(f"double bar seen")
+            self.maybe_lengthen_last_note(num_notes=0) # driven by neume length
 
-        match_options = GabcParser.CLEF_PATTERN.match(g_str)
-        if match_options:
+        match_obj = GabcParser.CLEF_PATTERN.match(g_str)
+        if match_obj:
+            self.logger.debug(f"clef seen")
             self.set_clef(g_str)
 
-        match_options = re.search(r"[a-m]([xy])", g_str)  # this is an accidental
-        if match_options:
-            GabcParser.logger.debug(f"found accidental {match_options[0]}")
-            self.set_accidental(match_options[1])
+        match_obj = re.search(r"[a-m]([xy])", g_str)  # this is an accidental
+        if match_obj:
+            GabcParser.logger.debug(f"found accidental {match_obj[0]}")
+            self.set_accidental(match_obj[1])
             g_str = re.sub(r"[a-m][xy]", "", g_str)
 
         for pattern in GabcParser.REMOVAL_PATTTERNS:
             g_str = re.sub(pattern, "", g_str)
 
-        match_options = re.search(r"[a-l]+$", g_str)  # ends in multi-note neume?
-        if match_options:
-            self.last_neume_len = match_options.span()[1] - match_options.span()[0]
+        match_obj = re.search(GabcParser.LAST_NEUME_PATTERN, g_str)  # ends in multi-note neume?
+        if match_obj:
+            self.logger.debug(f"last neume {match_obj.string[match_obj.start():match_obj.end()]} length={match_obj.span()[1]-match_obj.span()[0]}")
+            self.last_neume_len = match_obj.span()[1] - match_obj.span()[0]
 
         return g_str
 
@@ -168,7 +172,7 @@ class GabcParser:
 
             elif ch in {",", ";", ":"}:  # reached a bar
                 self.undo_accidental()
-                self.maybe_lengthen_last_note()
+                self.maybe_lengthen_last_note(num_notes=0) # driven by last neume
                 self.last_neume_len = 0
 
             elif ch == "~":
@@ -193,7 +197,9 @@ class GabcParser:
         if duplicate_note:  # like a tie, always increment
             self.note_stream[-1].increment_duration()
         else:
-            for note_num in range(max(self.last_neume_len, num_notes)):
+            if num_notes == 0: # a bar, use neume length
+                num_notes = self.last_neume_len
+            for note_num in range(num_notes):
                 if not self.note_stream[-1 - note_num].doubled:  # already doubled
                     self.note_stream[-1 - note_num].increment_duration()
 

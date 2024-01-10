@@ -47,6 +47,7 @@ class GabcParser:
     def __init__(self):
         self.note_stream = []
         self.last_neume_len = 0
+        self.scale = None
 
     def set_clef(self, clef):
         """
@@ -113,7 +114,8 @@ class GabcParser:
         )  # ends in multi-note neume?
         if match_obj:
             self.logger.debug(
-                f"last neume {match_obj.string[match_obj.start():match_obj.end()]} length={match_obj.span()[1]-match_obj.span()[0]}"
+                f"last neume {match_obj.string[match_obj.start():match_obj.end()]}"
+                f" length={match_obj.span()[1]-match_obj.span()[0]}"
             )
             self.last_neume_len = match_obj.span()[1] - match_obj.span()[0]
 

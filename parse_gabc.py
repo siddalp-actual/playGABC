@@ -45,20 +45,9 @@ class GabcParser:
     LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]*)$")  # ignore case
 
     def __init__(self):
-        self.tonic_adjust = 0
         self.note_stream = []
         self.last_neume_len = 0
-        # the semi_tones array may be modified on the fly by an accidental, but
-        # currently only a flattening of the 7th is currently supported
-        self.semi_tones = {
-            0: 0,
-            1: 2,
-            2: 4,
-            3: 5,
-            4: 7,
-            5: 9,
-            6: 11,
-        }
+        self.scale = None
 
     def set_clef(self, clef):
         """
@@ -72,11 +61,12 @@ class GabcParser:
         c4 says the bottom line is 6 notes below the tonic
 
         """
-        match_options = GabcParser.CLEF_PATTERN.match(clef.lower())
-        if not match_options:
+        match_obj = GabcParser.CLEF_PATTERN.match(clef.lower())
+        if not match_obj:
             raise ValueError
-        line = int(match_options[2])
-        self.tonic_adjust = ord(match_options[1]) - ord("c") - 2 * (line - 1)
+        line = int(match_obj[2])
+        # self.tonic_adjust = ord(match_options[1]) - ord("c") - 2 * (line - 1)
+        self.scale = Scale(tonic=ord(match_obj[1]) - ord("c") - 2 * (line - 1))
 
     def parse_gabc(self, note_array):
         """
@@ -102,12 +92,12 @@ class GabcParser:
         """
         match_obj = GabcParser.DOUBLE_BAR.match(g_str)  # double bar
         if match_obj:
-            self.logger.debug(f"double bar seen")
-            self.maybe_lengthen_last_note(num_notes=0) # driven by neume length
+            self.logger.debug("double bar seen")
+            self.maybe_lengthen_last_note(num_notes=0)  # driven by neume length
 
         match_obj = GabcParser.CLEF_PATTERN.match(g_str)
         if match_obj:
-            self.logger.debug(f"clef seen")
+            self.logger.debug("clef seen")
             self.set_clef(g_str)
 
         match_obj = re.search(r"[a-m]([xy])", g_str)  # this is an accidental
@@ -119,9 +109,14 @@ class GabcParser:
         for pattern in GabcParser.REMOVAL_PATTTERNS:
             g_str = re.sub(pattern, "", g_str)
 
-        match_obj = re.search(GabcParser.LAST_NEUME_PATTERN, g_str)  # ends in multi-note neume?
+        match_obj = re.search(
+            GabcParser.LAST_NEUME_PATTERN, g_str
+        )  # ends in multi-note neume?
         if match_obj:
-            self.logger.debug(f"last neume {match_obj.string[match_obj.start():match_obj.end()]} length={match_obj.span()[1]-match_obj.span()[0]}")
+            self.logger.debug(
+                f"last neume {match_obj.string[match_obj.start():match_obj.end()]}"
+                f" length={match_obj.span()[1]-match_obj.span()[0]}"
+            )
             self.last_neume_len = match_obj.span()[1] - match_obj.span()[0]
 
         return g_str
@@ -171,8 +166,8 @@ class GabcParser:
                 self.shorten_last_note()
 
             elif ch in {",", ";", ":"}:  # reached a bar
-                self.undo_accidental()
-                self.maybe_lengthen_last_note(num_notes=0) # driven by last neume
+                self.scale.undo_accidental()
+                self.maybe_lengthen_last_note(num_notes=0)  # driven by last neume
                 self.last_neume_len = 0
 
             elif ch == "~":
@@ -197,7 +192,7 @@ class GabcParser:
         if duplicate_note:  # like a tie, always increment
             self.note_stream[-1].increment_duration()
         else:
-            if num_notes == 0: # a bar, use neume length
+            if num_notes == 0:  # a bar, use neume length
                 num_notes = self.last_neume_len
             for note_num in range(num_notes):
                 if not self.note_stream[-1 - note_num].doubled:  # already doubled
@@ -216,28 +211,9 @@ class GabcParser:
         """
         assert on_off in {"x", "y"}
         if on_off == "x":  # a flat
-            self.semi_tones[6] = 10
+            self.scale.set_accidental("on")
         else:
-            self.undo_accidental()
-
-    def undo_accidental(self):
-        """
-        undo the set_accidental action
-        also used at bars
-        """
-        self.semi_tones[6] = 11
-
-    def semitones(self, n: int):
-        """
-        convert a note number into a number of semitones above (or below)
-        the tonic
-
-        note that the self.semi_tones array is not constant as it can be
-        altered by the presence of an accidental
-        """
-        assert isinstance(n, int)
-        octave, interval = divmod(n, 7)
-        return octave * 12 + self.semi_tones[interval]
+            self.scale.set_accidental("off")
 
     def make_note(self, letter):
         """
@@ -245,9 +221,7 @@ class GabcParser:
         add the tonidAdjust, built from the most recent clef
         """
         note_num = ord(letter) - ord("d")  # the bottom line of the stave
-        note_num += self.tonic_adjust
-        note_val = self.semitones(note_num)  # semitones relative to tonic
-        return Note(note_val)
+        return self.scale.make_note(note_num)
 
     def to_ly(self):
         """
@@ -270,6 +244,95 @@ class GabcParser:
         print("}")
 
 
+class Scale:
+    """
+    affected by accidentals and the key-signature this is used
+    to map a note position on a stave to a pitch, or more properly,
+    a midi-note number
+    """
+
+    def __init__(self, tonic=0):
+        """
+        create a new scale object
+        """
+        self.tonic_adjust = tonic
+        # the semi_tones array may be modified on the fly by an accidental, but
+        # currently only a flattening of the 7th is currently supported
+        self.semi_tones = {
+            0: 0,
+            1: 2,
+            2: 4,
+            3: 5,
+            4: 7,
+            5: 9,
+            6: 11,
+        }
+
+    def make_note(self, stave_pos: int):
+        """
+        find how many lines we are above the bottom of the stave, then
+        add the tonidAdjust, built from the most recent clef
+        """
+        stave_pos += self.tonic_adjust
+        note_val = self.semitones(stave_pos)  # semitones relative to tonic
+        return Note(note_val, self)
+
+    def semitones(self, n: int):
+        """
+        convert a note number into a number of semitones above (or below)
+        the tonic
+
+        note that the self.semi_tones array is not constant as it can be
+        altered by the presence of an accidental
+        """
+        assert isinstance(n, int)
+        octave, interval = divmod(n, 7)
+        return octave * 12 + self.semi_tones[interval]
+
+    def lower_note(self, value_in_semitones):
+        """
+        given a value in semitones within the scale,
+        find the next lower note, (this may be one or two semitones
+        lower depending on where value_in_semitones lies)
+        and return a Note representing it
+        """
+        octave, interval = divmod(value_in_semitones, 12)
+        pos = self.get_scale_pos(interval)  # pos in range [0:6]
+        if pos == 0:
+            pos = 6
+            octave -= 1
+        else:
+            pos -= 1
+        return Note(12 * octave + self.semitones(pos), self)
+
+    def get_scale_pos(self, intvl):
+        """
+        reverse lookup the value to find the corresponding key of the semi_tones array
+        """
+        for note, semis in self.semi_tones.items():
+            if semis == intvl:
+                return note
+        logger.error(f"get_scale_pos: {intvl=} not found")
+        raise ValueError
+
+    def set_accidental(self, on_off):
+        """
+        for the moment we always assume it's the seventh
+        """
+        assert on_off in {"on", "off"}
+        if on_off == "on":  # a flat
+            self.semi_tones[6] = 10
+        else:
+            self.undo_accidental()
+
+    def undo_accidental(self):
+        """
+        undo the set_accidental action
+        also used at bars
+        """
+        self.semi_tones[6] = 11
+
+
 class Note:
     """
     in midi notation, middle C is note 60 (=x3c)
@@ -279,16 +342,26 @@ class Note:
 
     LY_DURATION = ["", "8", "4", "2", "2.", "1"]
     NORMAL_DURATION = 2
+    MIDI_PITCH_OFFSET = 60
 
     logger = logging.getLogger("Note")
 
-    def __init__(self, val: int):
+    def __init__(self, val: int, scale: Scale):
         Note.logger.debug(f"__init__() created note {val}")
-        self.val = val + 60
+        self.val = val + Note.MIDI_PITCH_OFFSET
+        self.scale = scale
         self.duration = self.NORMAL_DURATION
         self.ornamentation = None
         self.doubled = False
         Note.logger.info(f"{self.to_ly()}")
+
+    def get_note_lower(self):
+        """
+        Need to use the current scale, to work out what the next lower note
+        would be
+        """
+        val = self.val - Note.MIDI_PITCH_OFFSET
+        return self.scale.lower_note(val)
 
     @staticmethod
     def ly_fmt(note_num, octave, duration):
@@ -338,7 +411,8 @@ class Note:
 
         passing_duration = "8"
         main_frm = Note.ly_fmt(note_array[notenum], octave_indicator, passing_duration)
-        passing_note_oct, passing_note_num = divmod(self.val - 2, 12)
+        passing_note = self.get_note_lower()
+        passing_note_oct, passing_note_num = divmod(passing_note.val, 12)
         pn_frm = "{:s}{:s}{:s}".format(
             note_array[passing_note_num],
             Note.ly_octave(passing_note_oct),

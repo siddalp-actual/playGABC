@@ -289,6 +289,32 @@ class Scale:
         octave, interval = divmod(n, 7)
         return octave * 12 + self.semi_tones[interval]
 
+    def lower_note(self, value_in_semitones):
+        """
+        given a value in semitones within the scale,
+        find the next lower note, (this may be one or two semitones
+        lower depending on where value_in_semitones lies)
+        and return a Note representing it
+        """
+        octave, interval = divmod(value_in_semitones, 12)
+        pos = self.get_scale_pos(interval)  # pos in range [0:6]
+        if pos == 0:
+            pos = 6
+            octave -= 1
+        else:
+            pos -= 1
+        return Note(12 * octave + self.semitones(pos), self)
+
+    def get_scale_pos(self, intvl):
+        """
+        reverse lookup the value to find the corresponding key of the semi_tones array
+        """
+        for note, semis in self.semi_tones.items():
+            if semis == intvl:
+                return note
+        logger.error(f"get_scale_pos: {intvl=} not found")
+        raise ValueError
+
     def set_accidental(self, on_off):
         """
         for the moment we always assume it's the seventh
@@ -316,17 +342,26 @@ class Note:
 
     LY_DURATION = ["", "8", "4", "2", "2.", "1"]
     NORMAL_DURATION = 2
+    MIDI_PITCH_OFFSET = 60
 
     logger = logging.getLogger("Note")
 
     def __init__(self, val: int, scale: Scale):
         Note.logger.debug(f"__init__() created note {val}")
-        self.val = val + 60
+        self.val = val + Note.MIDI_PITCH_OFFSET
         self.scale = scale
         self.duration = self.NORMAL_DURATION
         self.ornamentation = None
         self.doubled = False
         Note.logger.info(f"{self.to_ly()}")
+
+    def get_note_lower(self):
+        """
+        Need to use the current scale, to work out what the next lower note
+        would be
+        """
+        val = self.val - Note.MIDI_PITCH_OFFSET
+        return self.scale.lower_note(val)
 
     @staticmethod
     def ly_fmt(note_num, octave, duration):
@@ -376,7 +411,8 @@ class Note:
 
         passing_duration = "8"
         main_frm = Note.ly_fmt(note_array[notenum], octave_indicator, passing_duration)
-        passing_note_oct, passing_note_num = divmod(self.val - 2, 12)
+        passing_note = self.get_note_lower()
+        passing_note_oct, passing_note_num = divmod(passing_note.val, 12)
         pn_frm = "{:s}{:s}{:s}".format(
             note_array[passing_note_num],
             Note.ly_octave(passing_note_oct),

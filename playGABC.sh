@@ -1,5 +1,7 @@
 #! /bin/bash
 echo "args: $@"
-./parse_gabc.py "$@" > try.ly
-lilypond try.ly
-timidity try.midi
+mydir=`dirname $0`
+fn="playGABC"
+$mydir/parse_gabc.py "$@" > $fn.ly
+lilypond $fn.ly
+timidity $fn.midi

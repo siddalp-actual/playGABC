@@ -40,9 +40,12 @@ class GabcParser:
         DOUBLE_BAR,
         CLEF_PATTERN,
         re.compile(r"\[\d+\]"),  # eg [3] note spacing
-        re.compile(r"\[.*?\]"),  # eg [ob:0;1mm] slur and [alt:stuff]
+        re.compile(r"\[.*\]"),  # eg [ob:0;1mm] slur and [alt:stuff]
     ]
-    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]*)$")  # ignore case
+
+    # matches a neume (letters) or a terminating dot, set up to return
+    # length of either
+    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]+)$|\.$")  # ?i: => qignore case
 
     def __init__(self):
         self.note_stream = []
@@ -109,12 +112,11 @@ class GabcParser:
         for pattern in GabcParser.REMOVAL_PATTTERNS:
             g_str = re.sub(pattern, "", g_str)
 
-        match_obj = re.search(
-            GabcParser.LAST_NEUME_PATTERN, g_str
-        )  # ends in multi-note neume?
+        # does it end in multi-note neume?
+        match_obj = GabcParser.LAST_NEUME_PATTERN.search(g_str)
         if match_obj:
             self.logger.debug(
-                f"last neume {match_obj.string[match_obj.start():match_obj.end()]}"
+                f"last neume {match_obj.string[match_obj.start():match_obj.end()]}"\
                 f" length={match_obj.span()[1]-match_obj.span()[0]}"
             )
             self.last_neume_len = match_obj.span()[1] - match_obj.span()[0]
@@ -128,6 +130,8 @@ class GabcParser:
         GabcParser.logger.info(f"decoding {g_str}")
 
         g_str = self.deal_with_syllable_level(g_str)
+
+        GabcParser.logger.info(f"after syllable level {g_str} {self.last_neume_len=}")
 
         prev_note = ""  # handle consecutive identical notes as lengthening
         dot_seen = False
@@ -340,7 +344,7 @@ class Note:
 
     """
 
-    LY_DURATION = ["", "8", "4", "2", "2.", "1"]
+    LY_DURATION = ["", "8", "4", "4.", "2", "2.", "1"]
     NORMAL_DURATION = 2
     MIDI_PITCH_OFFSET = 60
 

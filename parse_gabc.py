@@ -235,6 +235,7 @@ class GabcParser:
         print('\\language "english"')
         print("\\score {")
         print("\\sequential {")
+        print("\\clef \"treble_8\"")
         for note in self.note_stream:
             print(f"{note.to_ly():s} ")
         print("}")

@@ -36,16 +36,18 @@ class GabcParser:
     DOUBLE_DOT = re.compile(r"\.\.")
     DOUBLE_BAR = re.compile(r"::")
     CLEF_PATTERN = re.compile(r"([cf])([1-4])")
+    LINE_END = re.compile(r"(?i:z0?)") # upper or lower z with optional 0
     REMOVAL_PATTTERNS = [
         DOUBLE_BAR,
         CLEF_PATTERN,
         re.compile(r"\[\d+\]"),  # eg [3] note spacing
         re.compile(r"\[.*\]"),  # eg [ob:0;1mm] slur and [alt:stuff]
+        LINE_END,
     ]
 
     # matches a neume (letters) or a terminating dot, set up to return
     # length of either
-    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]+)$|\.$")  # ?i: => qignore case
+    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]+)$|\.$")  # ?i: => ignore case
 
     def __init__(self):
         self.note_stream = []
@@ -64,12 +66,14 @@ class GabcParser:
         c4 says the bottom line is 6 notes below the tonic
 
         """
+        self.logger.debug(f"set_clef: called with {clef}")
         match_obj = GabcParser.CLEF_PATTERN.match(clef.lower())
         if not match_obj:
             raise ValueError
         line = int(match_obj[2])
-        # self.tonic_adjust = ord(match_options[1]) - ord("c") - 2 * (line - 1)
-        self.scale = Scale(tonic=ord(match_obj[1]) - ord("c") - 2 * (line - 1))
+        tonic_adjust = ord(match_obj[1]) - ord("c") - 2 * (line - 1)
+        self.logger.info(f"set_clef: new scale {tonic_adjust}")
+        self.scale = Scale(tonic=tonic_adjust)
 
     def parse_gabc(self, note_array):
         """
@@ -98,10 +102,10 @@ class GabcParser:
             self.logger.debug("double bar seen")
             self.maybe_lengthen_last_note(num_notes=0)  # driven by neume length
 
-        match_obj = GabcParser.CLEF_PATTERN.match(g_str)
+        match_obj = GabcParser.CLEF_PATTERN.search(g_str)
         if match_obj:
             self.logger.debug("clef seen")
-            self.set_clef(g_str)
+            self.set_clef(match_obj.group(0))
 
         match_obj = re.search(r"[a-m]([xy])", g_str)  # this is an accidental
         if match_obj:

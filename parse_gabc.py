@@ -52,7 +52,8 @@ class GabcParser:
     def __init__(self):
         self.note_stream = []
         self.last_neume_len = 0
-        self.scale = None
+        self.clef_scale = None
+        self.current_scale = None
 
     def set_clef(self, clef):
         """
@@ -73,7 +74,8 @@ class GabcParser:
         line = int(match_obj[2])
         tonic_adjust = ord(match_obj[1]) - ord("c") - 2 * (line - 1)
         self.logger.info(f"set_clef: new scale {tonic_adjust}")
-        self.scale = Scale(tonic=tonic_adjust)
+        self.clef_scale = Scale(tonic=tonic_adjust)
+        self.current_scale = self.clef_scale
 
     def parse_gabc(self, note_array):
         """
@@ -174,7 +176,9 @@ class GabcParser:
                 self.shorten_last_note()
 
             elif ch in {",", ";", ":"}:  # reached a bar
-                self.scale.undo_accidental()
+                # reset any accidentals, by reverting to the scale for the clef
+                # self.scale.undo_accidental()
+                self.current_scale = self.clef_scale
                 self.maybe_lengthen_last_note(num_notes=0)  # driven by last neume
                 self.last_neume_len = 0
 
@@ -218,10 +222,12 @@ class GabcParser:
         for the moment we always assume it's the seventh
         """
         assert on_off in {"x", "y"}
+        # the current_scale will change, so build a new one like that for the clef
+        self.current_scale = Scale(tonic = self.clef_scale.tonic_adjust)
         if on_off == "x":  # a flat
-            self.scale.set_accidental("on")
+            self.current_scale.set_accidental("on")
         else:
-            self.scale.set_accidental("off")
+            self.current_scale.set_accidental("off")
 
     def make_note(self, letter):
         """
@@ -229,7 +235,7 @@ class GabcParser:
         add the tonidAdjust, built from the most recent clef
         """
         note_num = ord(letter) - ord("d")  # the bottom line of the stave
-        return self.scale.make_note(note_num)
+        return self.current_scale.make_note(note_num)
 
     def to_ly(self):
         """

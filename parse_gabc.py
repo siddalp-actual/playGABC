@@ -185,6 +185,9 @@ class GabcParser:
             elif ch == "~":
                 pass  # ignore liquescent for the mo
 
+            elif ch == "`":
+                pass  # ignore back-tick (a breath comma in GABC)
+
             else:
                 GabcParser.logger.error(f"can't cope with :{ch}:")
                 raise ValueError

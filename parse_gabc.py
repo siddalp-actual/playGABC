@@ -45,9 +45,10 @@ class GabcParser:
         LINE_END,
     ]
 
-    # matches a neume (letters) or a terminating dot, set up to return
-    # length of either
-    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-l]+)$|\.$")  # ?i: => ignore case
+    # matches a neume (letters which may contain a spacing/cut char) 
+    # or a terminating dot, 
+    # set up to return length of either
+    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-m\!\/]+)$|\.$")  # ?i: => ignore case
 
     def __init__(self):
         self.note_stream = []
@@ -197,7 +198,8 @@ class GabcParser:
         a dot lengthens a note, as does the last note before a bar (division)
         some music combines both notations, in which case, only allow it to be
         doubled.
-        if we're lengthening as a result of a bar line, then all notes in final neume get lengthened
+        if we're lengthening as a result of a bar line, then all notes in final neume 
+        get lengthened (max of 2, else only last one)
         duplicate_note is for the case where multiple same notes are encountered in a
         syllable leading to >= 3* length
         """
@@ -208,7 +210,10 @@ class GabcParser:
             self.note_stream[-1].increment_duration()
         else:
             if num_notes == 0:  # a bar, use neume length
-                num_notes = self.last_neume_len
+                if self.last_neume_len == 2:
+                    num_notes = self.last_neume_len
+                else:
+                    num_notes = 1
             for note_num in range(num_notes):
                 if not self.note_stream[-1 - note_num].doubled:  # already doubled
                     self.note_stream[-1 - note_num].increment_duration()

@@ -363,7 +363,9 @@ class Note:
 
     """
 
-    LY_DURATION = ["", "8", "4", "4.", "2", "2.", "1"]
+    # LY_DURATION = ["", "8", "4", "4.", "2", "2.", "1"]
+    #                   1    2    3     4    5     6       7   8
+    LY_DURATION = ["", "8", "4", "4.", "2", "2.5!", "2.", "3.5!", "1"]
     NORMAL_DURATION = 2
     MIDI_PITCH_OFFSET = 60
 

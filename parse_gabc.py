@@ -263,7 +263,7 @@ class GabcParser:
         for note in self.note_stream:
             print(f"{note.to_ly():s} ")
         print("}")
-        print("\\midi { \\tempo 4 = 170 }")
+        print("\\midi { \\tempo 4 = 150 }")
         print("}")
 
 

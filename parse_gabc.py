@@ -48,9 +48,10 @@ class GabcParser:
     ]
 
     # matches a neume (letters which may contain a spacing/cut char) 
+    # or a v for virga (but note these additional chars break the length)
     # or a terminating dot, 
     # set up to return length of either
-    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-m\!\/]+)$|\.$")  # ?i: => ignore case
+    LAST_NEUME_PATTERN = re.compile(r"(?i:[a-m\!\/v]+)$|\.$")  # ?i: => ignore case
 
     def __init__(self):
         self.note_stream = []

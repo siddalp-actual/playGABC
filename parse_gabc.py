@@ -37,12 +37,14 @@ class GabcParser:
     DOUBLE_BAR = re.compile(r"::")
     CLEF_PATTERN = re.compile(r"([cf])([1-4])")
     LINE_END = re.compile(r"(?i:z0?)") # upper or lower z with optional 0
+    GABC_HEADER = re.compile(r"^\w+:\w+;")
     REMOVAL_PATTTERNS = [
         DOUBLE_BAR,
         CLEF_PATTERN,
         re.compile(r"\[\d+\]"),  # eg [3] note spacing
         re.compile(r"\[.*\]"),  # eg [ob:0;1mm] slur and [alt:stuff]
         LINE_END,
+        GABC_HEADER,
     ]
 
     # matches a neume (letters which may contain a spacing/cut char) 

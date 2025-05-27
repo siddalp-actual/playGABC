@@ -47,9 +47,9 @@ class GabcParser:
         GABC_HEADER,
     ]
 
-    # matches a neume (letters which may contain a spacing/cut char) 
+    # matches a neume (letters which may contain a spacing/cut char)
     # or a v for virga (but note these additional chars break the length)
-    # or a terminating dot, 
+    # or a terminating dot,
     # set up to return length of either
     LAST_NEUME_PATTERN = re.compile(r"(?i:[a-m\!\/v]+)$|\.$")  # ?i: => ignore case
 
@@ -201,7 +201,7 @@ class GabcParser:
         a dot lengthens a note, as does the last note before a bar (division)
         some music combines both notations, in which case, only allow it to be
         doubled.
-        if we're lengthening as a result of a bar line, then all notes in final neume 
+        if we're lengthening as a result of a bar line, then all notes in final neume
         get lengthened (max of 2, else only last one)
         duplicate_note is for the case where multiple same notes are encountered in a
         syllable leading to >= 3* length
@@ -534,7 +534,11 @@ def find_gabc(file_name, snippet=1):
             logger.info(matches)
             raise ValueError
 
-        logger.info(text)
+    elif file_name.endswith(".gabc"):
+        # throw away the tags of the form ^\w+:.+;$
+        text =re.sub(r"\w+:.*;\s+", "", text)
+
+    logger.info(text)
 
     return text
 
